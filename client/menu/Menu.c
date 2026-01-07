@@ -142,7 +142,6 @@ void menu_enter(menu_t *menu) {
         menu_set(menu, APP_EXITED, 0, 0, 0);
         return;
       }
-      // HELP zatiaľ neriešim: ostávaš v MAIN_MENU */
       return;
     }
 //  "STANDARD",
@@ -155,7 +154,6 @@ void menu_enter(menu_t *menu) {
 //  "BACK"
 
     case GAME_WIZARD: {
-      //0 
       switch (menu->selectedOptionId) {
         case 0:
           menu->setup.timed = 0;

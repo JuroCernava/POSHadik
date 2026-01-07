@@ -6,19 +6,19 @@
 #ifndef GAME_H
 #define GAME_H
 
-enum GameMode {
+typedef enum {
   STANDARD,
   TIMED
-};
+} GameMode;
 
-enum ObjectType {
+typedef enum {
   FOOD,
   OBSTACLE
-};
+} ObjectType;
 
 typedef struct {
   position_t position;
-  enum ObjectType objectType;
+  ObjectType objectType;
 } game_object_t;
 
 typedef struct {
@@ -31,7 +31,7 @@ typedef struct {
 
 void game_init(game_t *game, int height, int width, int time, _Bool obstacles);
 void game_pause(game_t *game, unsigned char playerId);
-void add_game_object(game_t *game, position_t* position, enum ObjectType type);
+void add_game_object(game_t *game, position_t* position, ObjectType type);
 void update_player_pos(game_t* game, player_t* player);
 
 #endif

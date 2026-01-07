@@ -51,11 +51,11 @@ static void align_text(const char * const *lines, int count, int skip,
     if (longestOut) *longestOut = longest;
 }
 
-void render_frame(int rows, int cols) {
+void render_frame(int rows, int cols, world_corner_t *corners) {
   int maxX,maxY;
   getmaxyx(stdscr, maxY, maxX);
   if (rows == 0 && cols == 0) {
-    render_frame(maxY, maxX);
+    render_frame(maxY, maxX, corners);
   } else {
     int startX = (maxX - cols) / 2;
     int startY = (maxY - rows) / 2;
@@ -67,6 +67,10 @@ void render_frame(int rows, int cols) {
       mvaddch(startY + y, startX, '|');
       mvaddch(startY + y, startX + cols - 1, '|');
     }
+    corners->startX = startX;
+    corners->startY = startY;
+    corners->endX = startX + cols - 1;
+    corners->endY = startY + rows - 1;
     mvaddch(startY, startX, '+');
     mvaddch(startY, startX + cols - 1, '+');
     mvaddch(startY + rows - 1, startX, '+');
@@ -80,9 +84,8 @@ void render_interface(menu_t *menu) {
     getmaxyx(stdscr, rows, cols);
 
     clear();
-    render_frame(menu->currOptionCnt + 4, menu->longestEntry + 8);
-
-    /* 1) HELP sa kreslí hore, ale NEKONČÍME funkciu (menu sa má zobraziť tiež) */
+    world_corner_t corners;
+    render_frame(menu->currOptionCnt + 4, menu->longestEntry + 8, &corners);
     int helpCount = 0;
     if (menu->helpShown) {
         const char *const *lines = NULL;
@@ -90,14 +93,12 @@ void render_interface(menu_t *menu) {
         render_help(menu);
     }
 
-    /* 2) Menu položky */
     const char *const *items = NULL;
     get_menu_items(menu, &items);
     const game_setup_t *setup = menu_get_setup(menu);
 
     int xStart = (cols - menu->longestEntry) / 2;
     int yStart = (rows - menu->currOptionCnt) / 2;
-    /* 4) Vykreslenie menu */
     for (int j = 0; j < menu->currOptionCnt; ++j) {
         int x = (menu->selectedOptionId == j) ? (xStart - 4) : xStart;
 
@@ -112,13 +113,20 @@ void render_interface(menu_t *menu) {
         }
 
         switch (j) {
-            case 0: mvprintw(yStart + j, x, "%s%s", items[j], (setup && setup->timed == 0) ? " [X]" : " [ ]"); break;
-            case 1: mvprintw(yStart + j, x, "%s%s", items[j], (setup && setup->timed == 1) ? " [X]" : " [ ]"); break;
-            case 2: mvprintw(yStart + j, x, "%s %d", items[j], setup ? setup->players : 0); break;
-            case 3: mvprintw(yStart + j, x, "%s %d", items[j], setup ? setup->world_w : 0); break;
-            case 4: mvprintw(yStart + j, x, "%s %d", items[j], setup ? setup->world_h : 0); break;
-            case 5: mvprintw(yStart + j, x, "%s %s", items[j], (setup && setup->obstacles) ? "ON" : "OFF"); break;
-            default: mvprintw(yStart + j, x, "%s", items[j]); break;
+            case 0: mvprintw(yStart + j, x, "%s%s", items[j], (setup && setup->timed == 0) ? " [X]" : " [ ]");
+              break;
+            case 1: mvprintw(yStart + j, x, "%s%s", items[j], (setup && setup->timed == 1) ? " [X]" : " [ ]");
+              break;
+            case 2: mvprintw(yStart + j, x, "%s %d", items[j], setup ? setup->players : 0); 
+              break;
+            case 3: mvprintw(yStart + j, x, "%s %d", items[j], setup ? setup->world_w : 0); 
+              break;
+            case 4: mvprintw(yStart + j, x, "%s %d", items[j], setup ? setup->world_h : 0); 
+              break;
+            case 5: mvprintw(yStart + j, x, "%s %s", items[j], (setup && setup->obstacles) ? "ON" : "OFF");
+              break;
+            default: mvprintw(yStart + j, x, "%s", items[j]); 
+              break;
         }
     }
 
@@ -141,6 +149,33 @@ void render_help(menu_t *menu) {
   }
 }
 
+void render_obstacle(int x, int y) {
+  for (int i = -1; i < 2; ++i) {
+    for (int j = -1; j < 2; ++j) {
+      mvaddch(y + i, x + j, '#');
+    }
+  }
+}
+
+void render_game_world(menu_t *menu) {
+  clear();
+  world_corner_t corners;
+  render_frame(menu->setup.world_h, menu->setup.world_w, &corners);
+  if (menu->setup.obstacles) {
+    int cols = corners.endX - corners.startX - 2;
+    int rows = corners.endY - corners.startY - 2;
+    for (size_t oid = 0; oid < 6; ++oid) {
+        int randX = corners.startX + 1 + (rand() % cols);
+        int randY = corners.startY + 1 + (rand() % rows);
+        render_obstacle(randX, randY);
+    }
+  }
+  refresh();
+}
+
+void render_player(position_t *newStart, position_t *oldEnd, _Bool init) {
+
+}
 
 void render_message(char *message) {
   int maxX, maxY;

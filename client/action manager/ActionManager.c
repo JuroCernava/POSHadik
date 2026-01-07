@@ -19,13 +19,39 @@ int handle_event(int keyCode, action_manager_t *manager, menu_t *menu) {
       case 13:  //'\r'
       case KEY_RIGHT: // PRE ISTOTU... 
         menu_enter(menu);
+        if (menu->currMenu == GAME_RUNNING) {
+          manager->state = AM_GAME;
+        }
         return 0;
-
       default:
         return -1;
     }
   } else if (manager->state == AM_GAME) {
-    return -1;
+    switch(keyCode) {
+      case 32:
+      case 10:
+      case 13:
+      case KEY_RIGHT:
+        manager->state = AM_PAUSED;
+        return 0;
+      default:
+        return -1;
+    }
+  } else if (manager->state == AM_PAUSED) {
+    switch(keyCode) {
+      case 32:
+      case 10:
+      case 13:
+      case KEY_RIGHT:
+        menu_enter(menu);
+        manager->state = AM_MENU;
+        return 0;
+      case 27:
+        manager->state = AM_GAME;
+        return 0;
+      default:
+        return -1;
+    }
   } else {
     return -2;
   }

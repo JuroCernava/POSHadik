@@ -1,7 +1,7 @@
 #include "Player.h"
 #include <stdlib.h>
 
-enum Direction opposite(enum Direction dir) {
+Direction opposite(Direction dir) {
     switch(dir) {
         case STATIC: return STATIC;
         case UP: return DOWN;

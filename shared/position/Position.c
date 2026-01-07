@@ -11,6 +11,6 @@ void position_update(position_t* position, int newX, int newY) {
 }
 
 void position_destroy(position_t* position) {
-  position->xPos = 0;
-  position->yPos = 0;
+  position->xPos = -1;
+  position->yPos = -1;
 }

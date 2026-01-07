@@ -1,19 +1,25 @@
 #include "Client.h"
+#include "action manager/ActionManager.h"
+#include "menu/Menu.h"
 #include "renderer/Renderer.h"
 #include <ncurses.h>
-
+#include <stdlib.h>
+#include <time.h>
 void client_init(client_t *client) {
+  srand((unsigned)time(NULL));
   action_manager_init(&client->actionManager);
   client->gameId = -1;   
   client->playerId = -1;     
   init_display(&client->display);
-  render_frame(client->menu.currOptionCnt + 2, client->menu.longestEntry + 6);
+  world_corner_t corners;
+  render_frame(client->menu.currOptionCnt + 2, client->menu.longestEntry + 6, &corners);
   menu_init(&client->menu);
   render_interface(&client->menu);
 }
 
 void client_listen(client_t *client) {
   keypad(stdscr, TRUE);
+  world_corner_t corners;
   while (1) {
     int keyPressed = getch();
     int newAction = handle_event(keyPressed, &client->actionManager, &client->menu);
@@ -23,8 +29,12 @@ void client_listen(client_t *client) {
         break;
       } else {
         clear();
-        render_frame(client->menu.currOptionCnt + 2, client->menu.longestEntry + 6);
-        render_interface(&client->menu);
+        render_frame(client->menu.currOptionCnt + 2, client->menu.longestEntry + 6, &corners);
+        if (client->actionManager.state == AM_GAME) {
+          render_game_world(&client->menu);
+        } else {
+          render_interface(&client->menu);
+        } 
       }
     } else {
       render_message("Stlacene zle tlacidlo.");

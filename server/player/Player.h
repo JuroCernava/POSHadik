@@ -4,18 +4,18 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
-enum Direction {
+typedef enum {
   UP,
   DOWN,
   LEFT,
   RIGHT,
   STATIC
-};
+} Direction;
 
 typedef struct {
   unsigned char id;
   position_t *positions;
-  enum Direction direction;
+  Direction direction;
   _Bool living;
   int score;
 } player_t;
@@ -23,7 +23,7 @@ typedef struct {
 void player_init(player_t *player, unsigned char id, int rows, int cols);
 void update_player_position(player_t *player, position_t* newPosition);
 void update_player_status(player_t *player);
-void update_player_direction(player_t *player, enum Direction newDirection);
+void update_player_direction(player_t *player, Direction newDirection);
 void player_destroy(player_t *player);
 
 #endif

@@ -3,7 +3,7 @@
 
 typedef enum {
   MAIN_MENU = 0,
-  GAME_WIZARD,     /* 1 menu pre NEW GAME nastavenia */
+  GAME_WIZARD,     
   GAMES_LOBBY,
   GAME_RUNNING,
   APP_EXITED
