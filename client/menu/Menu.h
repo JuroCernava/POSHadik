@@ -12,6 +12,7 @@ typedef enum {
 typedef struct {
   int timed;        /* 0=STANDARD, 1=TIMED */
   int obstacles;    /* 0/1 */
+  double time;
   int world_h;
   int world_w;
   int players;
@@ -20,6 +21,7 @@ typedef struct {
 typedef struct {
   Menu currMenu;
   int selectedOptionId;
+  _Bool timeSetting;
   int currOptionCnt;
   int longestEntry;
   int helpShown;

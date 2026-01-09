@@ -9,10 +9,22 @@ int handle_event(int keyCode, action_manager_t *manager, menu_t *menu) {
   if (manager->state == AM_MENU) {
     switch (keyCode) {
       case KEY_UP:
-        menu_prev(menu);
+        if (menu->timeSetting == 1) {
+          if (menu->setup.time < 30) {
+            menu->setup.time++;
+          }
+        } else {
+          menu_prev(menu);
+        }
         return 0;
       case KEY_DOWN:
-        menu_next(menu);
+        if (menu->timeSetting == 1) {
+          if (menu->setup.time > 1) {
+            menu->setup.time--;
+          }
+        } else {
+          menu_next(menu);
+        }
         return 0;
       // ak by ENTER nefungoval treba zmenit na KEY_RIGHT
       case 10:  //'\n'

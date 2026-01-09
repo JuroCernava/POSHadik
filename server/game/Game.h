@@ -1,10 +1,10 @@
+#ifndef GAME_H
+#define GAME_H
+
 #include <stdbool.h>
 #include "../player/Player.h"
 #include "../../shared/position/Position.h"
 #include <pthread.h>
-
-#ifndef GAME_H
-#define GAME_H
 
 typedef enum {
   STANDARD,
@@ -17,22 +17,51 @@ typedef enum {
 } ObjectType;
 
 typedef struct {
+  int startX;
+  int startY;
+  int endX;
+  int endY;
+} world_corner_t;
+
+typedef struct {
+  world_corner_t *corners;
+  GameMode mode;
+  int height;
+  int width;
+  int time;
+  _Bool obstacles;
+} g_settings_t;
+
+typedef struct {
   position_t position;
   ObjectType objectType;
 } game_object_t;
 
 typedef struct {
-  _Bool running;
-  size_t playerCap;
-  pthread_mutex_t mutex;
   game_object_t *objects;
   player_t *players;
+  size_t playerCap;
+  size_t playerCnt;
+  size_t objectsCap;
+  size_t objectsCnt;
+  _Bool running;
 } game_t;
 
-void game_init(game_t *game, int height, int width, int time, _Bool obstacles);
-void game_pause(game_t *game, unsigned char playerId);
-void add_game_object(game_t *game, position_t* position, ObjectType type);
-void update_player_pos(game_t* game, player_t* player);
+typedef struct {
+  size_t obstacleCnt;
+  size_t playerCnt;
+  int* playerScores;
+  position_t *foodPos;
+  position_t *obstaclePos;
+  position_t *pSegments;
+} world_snap_t;
 
+void game_init(game_t *game, g_settings_t *settings);
+void game_pause(game_t *game, unsigned char playerId);
+
+void game_run(game_t *game, g_settings_t *settings);
+void game_update_p_direction(game_t *game, int pId, Direction newDir);
+void update_player_pos(game_t* game, player_t* player);
+void game_destroy(game_t *game);
 #endif
 

@@ -1,22 +1,14 @@
+#ifndef RENDERER_H
+#define RENDERER_H
+
 #include "../../server/game/Game.h"
 #include "../menu/Menu.h"
 #include "../../shared/position/Position.h"
-
-#ifndef RENDERER_H
-#define RENDERER_H
 
 enum Window {
   MENU,
   GAME
 };
-
-typedef struct {
-  int startX;
-  int startY;
-  int endX;
-  int endY;
-} world_corner_t;
-
 
 typedef struct {
   enum Window window;

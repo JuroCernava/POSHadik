@@ -51,34 +51,56 @@ static void align_text(const char * const *lines, int count, int skip,
     if (longestOut) *longestOut = longest;
 }
 
-void render_frame(int rows, int cols, world_corner_t *corners) {
-  int maxX,maxY;
-  getmaxyx(stdscr, maxY, maxX);
-  if (rows == 0 && cols == 0) {
-    render_frame(maxY, maxX, corners);
-  } else {
+
+void calc_frame_corners(int rows, int cols, world_corner_t *corners) {
+    int maxX, maxY;
+    getmaxyx(stdscr, maxY, maxX);
+
+    if (rows == 0 && cols == 0) {
+        rows = maxY;
+        cols = maxX;
+    }
+
     int startX = (maxX - cols) / 2;
     int startY = (maxY - rows) / 2;
-    for (size_t x = 0; x < cols; x++) {
-      mvaddch(startY, startX + x, '-');    
-      mvaddch(startY + rows - 1, startX + x, '-'); 
-    }
-    for (int y = 1; y < rows - 1; y++) {
-      mvaddch(startY + y, startX, '|');
-      mvaddch(startY + y, startX + cols - 1, '|');
-    }
+
     corners->startX = startX;
     corners->startY = startY;
-    corners->endX = startX + cols - 1;
-    corners->endY = startY + rows - 1;
-    mvaddch(startY, startX, '+');
-    mvaddch(startY, startX + cols - 1, '+');
-    mvaddch(startY + rows - 1, startX, '+');
-    mvaddch(startY + rows - 1, startX + cols - 1, '+');
-    refresh();
-  }
+    corners->endX   = startX + cols - 1;
+    corners->endY   = startY + rows - 1;
 }
 
+
+void render_frame(int rows, int cols, world_corner_t *corners) {
+    // 1) vypocitaj rohy
+    calc_frame_corners(rows, cols, corners);
+
+    // 2) odvodenie rozmerov z rohov (aby to sedelo aj pri rows/cols==0)
+    int startX = corners->startX;
+    int startY = corners->startY;
+    int endX   = corners->endX;
+    int endY   = corners->endY;
+
+    int w = endX - startX + 1;   // cols
+    int h = endY - startY + 1;   // rows
+
+    // 3) kreslenie
+    for (int x = 0; x < w; ++x) {
+        mvaddch(startY,         startX + x, '-');
+        mvaddch(startY + h - 1, startX + x, '-');
+    }
+    for (int y = 1; y < h - 1; ++y) {
+        mvaddch(startY + y, startX,         '|');
+        mvaddch(startY + y, startX + w - 1, '|');
+    }
+
+    mvaddch(startY,         startX,         '+');
+    mvaddch(startY,         startX + w - 1, '+');
+    mvaddch(startY + h - 1, startX,         '+');
+    mvaddch(startY + h - 1, startX + w - 1, '+');
+
+    refresh();
+}
 void render_interface(menu_t *menu) {
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
@@ -115,7 +137,8 @@ void render_interface(menu_t *menu) {
         switch (j) {
             case 0: mvprintw(yStart + j, x, "%s%s", items[j], (setup && setup->timed == 0) ? " [X]" : " [ ]");
               break;
-            case 1: mvprintw(yStart + j, x, "%s%s", items[j], (setup && setup->timed == 1) ? " [X]" : " [ ]");
+            case 1: mvprintw(yStart + j, x, "%s%s %.0f min", items[j], (setup && setup->timed == 1) ? " [X]" : " [ ]",
+                                                                 (setup && setup->timed == 1) ? setup->time : 0);
               break;
             case 2: mvprintw(yStart + j, x, "%s %d", items[j], setup ? setup->players : 0); 
               break;
@@ -174,7 +197,7 @@ void render_game_world(menu_t *menu) {
 }
 
 void render_player(position_t *newStart, position_t *oldEnd, _Bool init) {
-
+  
 }
 
 void render_message(char *message) {

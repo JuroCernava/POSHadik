@@ -93,7 +93,7 @@ void menu_init(menu_t *menu) {
   menu->setup.players = clamp_int(menu->setup.players, MIN_PLAYERS, MAX_PLAYERS);
 }
 
-// konstantne znaky retazcov aj konstantny pointer na 
+// konstantne znaky retazcov aj konstantny pointer na adresy 
 void get_menu_items(const menu_t *menu, const char *const **items) {
   if (!menu || !items) return;
 
@@ -160,6 +160,7 @@ void menu_enter(menu_t *menu) {
           return;
         case 1: 
           menu->setup.timed = 1;
+          menu->timeSetting = !menu->timeSetting; 
           return;
         case 2:
           menu->setup.players++;
