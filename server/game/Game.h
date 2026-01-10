@@ -2,10 +2,11 @@
 #define GAME_H
 
 #include <stdbool.h>
+#include <stdatomic.h>
 #include "../player/Player.h"
 #include "../../shared/position/Position.h"
 #include <pthread.h>
-
+#include "../../shared/socket/Socket.h"
 typedef enum {
   STANDARD,
   TIMED
@@ -66,14 +67,31 @@ typedef struct {
   int players;
 } game_setup_t;
 
+typedef struct {
+  int *commands;
+  size_t commandCnt, inId, outId, cap;
+  //pthread_cond_t queueFull;
+  pthread_mutex_t mutex; 
+} command_queue_t;
+
+typedef struct {
+  game_t *game;
+  world_snap_t *snap;
+  command_queue_t commands;
+  socket_data_t *activeSocket; 
+} game_args_t;
+
 void game_init(game_t *game, g_settings_t *settings);
 void game_pause(game_t *game, unsigned char playerId);
 
 void game_to_snap(game_t *game, world_snap_t *snap);
-void game_run(game_t *game, world_snap_t *currSnap, _Bool *snapRdy);
+void* game_run(void *args);
+//void game_run(game_t *game, world_snap_t *snap, _Bool *snapRdy, socket_data_t *activeSocket);
 void game_update_p_direction(game_t *game, int pId, Direction newDir);
 void update_player_pos(game_t* game, player_t* player);
 void g_settings_from_setup(const game_setup_t *s, g_settings_t *settings);
 void game_destroy(game_t *game);
+void snap_destroy(world_snap_t *s);
+
 #endif
 

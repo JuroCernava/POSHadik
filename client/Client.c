@@ -14,6 +14,7 @@ static void send_setup_to_server(const menu_t *menu, int port) {
     char portStr[16];
     snprintf(portStr, sizeof(portStr), "%d", port);
     _Bool connected = 0;
+
     for (size_t i = 0; i < 100; ++i) {
       connected = socket_client_init(&cl, "127.0.0.1", portStr);
       if (connected) {
@@ -85,14 +86,13 @@ void client_listen(client_t *client) {
         if (client->actionManager.state == AM_GAME) {
           if (!serverStarted) {
             start_server_exec(6666);
-            printf("Spustam server...\n");
-            usleep(300000);
+            render_message("Spustam server...\n");
+            usleep(300000); // cakanie na spustenie servera 300ms
             serverStarted = 1;
           }
           if (serverStarted && !gameSetupSent) {
             send_setup_to_server(&client->menu, 6666);
             gameSetupSent = 1;
-            usleep(100000000);
           }  
           render_game_world(&client->menu);
         } else {

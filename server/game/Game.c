@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
-
+#include <string.h>
 
 #define OBSTACLE_CNT 6
 #define TICK_USEC 70000
@@ -149,43 +149,6 @@ static _Bool any_living(game_t *game) {
   return 0;
 }
 
-void game_create_snap(game_t *game, world_snap_t *world) {
-  world->playerCnt = game->playerCnt;
-  world->obstacleCnt = game->objectsCnt - game->playerCnt;
-
-  world->playerScores = malloc(world->playerCnt * sizeof(int));
-  
-  int lenSum = 0;
-  for (size_t pi = 0; pi < game->playerCnt; ++pi) {
-      int len = game->players[pi].score + 1;
-      world->playerScores[pi] = len;
-      lenSum += len;
-  }
-
-  world->pSegments = malloc(lenSum * sizeof(position_t));
-
-  int scoreCumul = 0;
-  for (size_t pi = 0; pi < game->playerCnt; ++pi) {
-      int currScore = world->playerScores[pi];
-      for (int si = 0; si < currScore; ++si) {
-          world->pSegments[scoreCumul + si] = game->players[pi].positions[si];
-      }
-      scoreCumul += currScore;  
-  }
-
-  world->obstaclePos = malloc(world->obstacleCnt * sizeof(position_t));
-  world->foodPos = malloc(game->playerCnt * sizeof(position_t));
-
-  for (size_t i = 0; i < world->obstacleCnt; ++i) {
-      world->obstaclePos[i] = game->objects[i].position;
-  }
-
-  for (size_t i = 0; i < game->playerCnt; ++i) {
-      world->foodPos[i] =
-          game->objects[world->obstacleCnt + i].position;
-  }
-}
-
 static void g_settings_init(g_settings_t *dst, const g_settings_t *src) {
     dst->mode = src->mode;
     dst->height = src->height;
@@ -278,53 +241,92 @@ void game_to_snap(game_t *game, world_snap_t *snap) {
     }
 }
 
-void game_run(game_t *game, world_snap_t *currSnap, _Bool *snapRdy) {
-    game->running = 1;
-    *snapRdy = 0;
-    double start = now_seconds();
-      double noLivingSince = 0.0;
-      while (game->running) {
-        // 1) move living players
-        for (size_t p = 0; p < game->playerCnt; ++p) {
-            if (!game->players[p].living) continue;
-            update_player_positions(&game->players[p], game->settings.height, game->settings.width);
-        }
-        // 2) collisions + food
-        for (size_t p = 0; p < game->playerCnt; ++p) {
-            if (!game->players[p].living) continue;
+//GAME LOOP s pomocnou...
+static _Bool cq_try_pop(command_queue_t *q, int *out)
+{
+    _Bool ok = 0;
+    pthread_mutex_lock(&q->mutex);
 
-            if (head_hits_obstacle(game, p) || head_hits_any_snake(game, p)) {
-                player_destroy(&game->players[p]); // living=0 + free positions (per your implementation)
-                continue;
-            }
-
-            int foodId = found_food(game, p);
-            if (foodId >= 0) {
-                player_grow(&game->players[p]);
-
-                  // respawn this food somewhere else
-                game_generate_object(game, FOOD, &game->objects[foodId]);
-            }
-        }
-        // 3) stop condition
-        if (game->settings.mode == TIMED) {
-            if ((now_seconds() - start) * 60 >= (double)game->settings.time) {
-                game->running = 0;
-            }
-        } else {
-            if (any_living(game)) {
-                noLivingSince = 0.0;
-            } else {
-                if (noLivingSince == 0.0) noLivingSince = now_seconds();
-                if (now_seconds() - noLivingSince >= 10.0) {
-                    game->running = 0;
-                }
-            }
-        }
-        game_to_snap(game, currSnap);
-        *snapRdy = 1;
-        usleep(TICK_USEC);
+    if (q->commandCnt > 0) {
+        *out = q->commands[q->outId];
+        q->outId = (q->outId + 1) % q->cap;
+        q->commandCnt--;
+        ok = 1;
     }
+
+    pthread_mutex_unlock(&q->mutex);
+    return ok;
 }
 
+void* game_run(void *args) {
+  game_args_t *gameArgs = args;
+  game_t *game = gameArgs->game;
+  world_snap_t *currSnap = gameArgs->snap;
+  game->running = 1;
+  double start = now_seconds();
+  double noLivingSince = 0.0;
+  socket_data_t *activeSocket = gameArgs->activeSocket;
+  while (game->running) {
+    int currCommand; 
+    while (cq_try_pop(&gameArgs->commands, &currCommand)) {
+      switch (currCommand) {
+        case 0: update_player_direction(&game->players[0], UP); break;
+        case 1: update_player_direction(&game->players[0], DOWN); break;
+        case 2: update_player_direction(&game->players[0], LEFT); break;
+        case 3: update_player_direction(&game->players[0], RIGHT); break;
+      }
+    }
+    // 1) move living players
+    for (size_t p = 0; p < game->playerCnt; ++p) {
+        if (!game->players[p].living) continue;
+        update_player_positions(&game->players[p], game->settings.height, game->settings.width);
+    }
+    // 2) collisions + food
+    for (size_t p = 0; p < game->playerCnt; ++p) {
+        if (!game->players[p].living) continue;
 
+        if (head_hits_obstacle(game, p) || head_hits_any_snake(game, p)) {
+            player_destroy(&game->players[p]); // living=0 + free positions (per your implementation)
+            continue;
+        }
+
+        int foodId = found_food(game, p);
+        if (foodId >= 0) {
+            player_grow(&game->players[p]);
+
+              // respawn this food somewhere else
+            game_generate_object(game, FOOD, &game->objects[foodId]);
+        }
+    }
+    // 3) stop condition
+    if (game->settings.mode == TIMED) {
+        if ((now_seconds() - start) * 60 >= (double)game->settings.time) {
+            game->running = 0;
+        }
+    } else {
+        if (any_living(game)) {
+            noLivingSince = 0.0;
+        } else {
+            if (noLivingSince == 0.0) noLivingSince = now_seconds();
+            if (now_seconds() - noLivingSince >= 10.0) {
+                game->running = 0;
+            }
+        }
+    }
+    game_to_snap(game, currSnap);
+    socket_write(activeSocket, (const char *)currSnap, sizeof(*currSnap));
+    snap_destroy(currSnap);
+    usleep(TICK_USEC);
+  }
+  shutdown(activeSocket->socket, SHUT_RDWR);
+  socket_destroy(activeSocket);
+  return NULL;
+}
+
+void snap_destroy(world_snap_t *s) {
+    free(s->playerScores);
+    free(s->foodPos);
+    free(s->obstaclePos);
+    free(s->pSegments);
+    memset(s, 0, sizeof(*s));
+}
