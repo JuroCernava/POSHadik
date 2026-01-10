@@ -1,9 +1,9 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "../../server/game/Game.h"
 #include "../menu/Menu.h"
 #include "../../shared/position/Position.h"
+#include <stdlib.h>
 
 enum Window {
   MENU,
@@ -11,8 +11,25 @@ enum Window {
 };
 
 typedef struct {
+  int startX;
+  int startY;
+  int endX;
+  int endY;
+} world_corner_t;
+
+typedef struct {
+  int height;
+  int width;
+  size_t obstacleCnt;
+  size_t playerCnt;
+  int* playerLens;
+  position_t *foodPos;
+  position_t *obstaclePos;
+  position_t *pSegments;
+} world_snap_t;
+
+typedef struct {
   enum Window window;
-  game_t *currGame;
 } display_t;
 
 void init_display(display_t *display);

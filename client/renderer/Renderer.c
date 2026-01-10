@@ -14,7 +14,6 @@
 
 void init_display(display_t *display) {
   display->window = MENU;
-  display->currGame = NULL;
   initscr();
   noecho();
   curs_set(0);
@@ -208,7 +207,6 @@ void render_message(char *message) {
 }
 
 void destroy_display(display_t *display) {
-  display->currGame = NULL;
   display->window = 0;
   endwin();
 }

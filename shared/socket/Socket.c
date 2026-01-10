@@ -107,6 +107,8 @@ void socket_server_init(socket_server_t *this, int port) {
   // Premena soketu na pasívny socket, na ktorom sa bude prijímať spojenie, pričom sa budú ukladať 1 ďalšie čakajúce pripojenie do frontu
   socket_listen(&this->passiveSocket, 1);
   this->port = port;
+  printf("[SERVER] bind+listen OK\n");
+  fflush(stdout);
 }
 
 // Funkcia na akceptovanie pripojenia klientom, pričom sa jedná o blokovacie volanie
@@ -129,7 +131,7 @@ void socket_server_destroy(socket_server_t *this) {
 }
 
 // Funkcia na inicializáciu klienta, pričom je potrebné uviesť aj názov servera a port, na ktorom bude zadaný server čakať na pripojenia
-void socket_client_init(socket_client_t *this, char *serverName, char *port) {
+_Bool socket_client_init(socket_client_t *this, char *serverName, char *port) {
   // Štruktúra používaná pre potreby uloženia adries servera
   struct addrinfo *server;
   // Štruktúra používaná na definovanie základných informácií o type komunikácie
@@ -165,12 +167,13 @@ void socket_client_init(socket_client_t *this, char *serverName, char *port) {
       // Ak zlyhalo, tak sa zatvorí soket a pokračuje sa ďalšou adresou
       printf("Zlyhanie pripojenia!\n");
       socket_destroy(&this->activeSocket);
+      return 0;
     } else {
       // Ak sa podarilo pripojiť, uvoľní sa získaná štruktúra z funkcie getaddrinfo a nastaví sa pomocná premenná na úspešné pripojenie
       freeaddrinfo(server);
       this->serverName = serverName;
       this->port = atoi(port);
-      return;
+      return 1;
     }
   }
 

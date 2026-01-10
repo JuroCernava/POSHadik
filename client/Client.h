@@ -19,16 +19,10 @@ typedef struct {
   menu_t menu;
 } client_t;
 
-typedef struct {
-  int height;
-  int width;
-  size_t obstacleCnt;
-  size_t playerCnt;
-  int* playerLens;
-  position_t *foodPos;
-  position_t *obstaclePos;
-  position_t *pSegments;
-} world_snap_t;
+typedef enum {
+  STANDARD,
+  TIMED
+} GameMode;
 
 void client_init(client_t *client);
 void client_listen(client_t *client);

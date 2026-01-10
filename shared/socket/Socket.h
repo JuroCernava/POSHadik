@@ -35,7 +35,7 @@ void socket_server_init(socket_server_t *this, int port);
 void socket_server_accept_connection(socket_server_t *this);
 void socket_server_destroy(socket_server_t *this);
 
-void socket_client_init(socket_client_t *this, char *serverName, char *port);
+_Bool socket_client_init(socket_client_t *this, char *serverName, char *port);
 void socket_client_destroy(socket_client_t *this);
 #endif
 

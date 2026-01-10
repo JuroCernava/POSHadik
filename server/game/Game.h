@@ -40,6 +40,9 @@ typedef struct {
 typedef struct {
   game_object_t *objects;
   player_t *players;
+  int height;
+  int width;
+  world_corner_t corners;
   size_t playerCap;
   size_t playerCnt;
   size_t objectsCap;
@@ -56,12 +59,23 @@ typedef struct {
   position_t *pSegments;
 } world_snap_t;
 
+typedef struct {
+  int timed;        /* 0=STANDARD, 1=TIMED */
+  int obstacles;    /* 0/1 */
+  double time;
+  int world_h;
+  int world_w;
+  int players;
+} game_setup_t;
+
 void game_init(game_t *game, g_settings_t *settings);
 void game_pause(game_t *game, unsigned char playerId);
 
-void game_run(game_t *game, g_settings_t *settings);
+void game_to_snap(game_t *game, world_snap_t *snap);
+void game_run(game_t *game, g_settings_t *settings, world_snap_t *currSnap, _Bool *snapRdy);
 void game_update_p_direction(game_t *game, int pId, Direction newDir);
 void update_player_pos(game_t* game, player_t* player);
+void g_settings_from_setup(const game_setup_t *s, g_settings_t *settings);
 void game_destroy(game_t *game);
 #endif
 

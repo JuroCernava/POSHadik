@@ -13,9 +13,7 @@ typedef struct {
   _Bool running;
 } server_t;
 
-void server_init(server_t *server, game_t *newGame);
-void server_listen(server_t *server);
-void server_accept_conn(server_t *server);
+void server_init(server_t *server, int port, game_setup_t *setup);
 void server_destroy(server_t *server);
 
 #endif

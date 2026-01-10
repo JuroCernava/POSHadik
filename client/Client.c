@@ -3,9 +3,48 @@
 #include "menu/Menu.h"
 #include "renderer/Renderer.h"
 #include <ncurses.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include "../shared/socket/Socket.h"
+
+static void send_setup_to_server(const menu_t *menu, int port) {
+    socket_client_t cl;
+    char portStr[16];
+    snprintf(portStr, sizeof(portStr), "%d", port);
+    _Bool connected = 0;
+    for (size_t i = 0; i < 100; ++i) {
+      connected = socket_client_init(&cl, "127.0.0.1", portStr);
+      if (connected) {
+        break;
+      }
+    }
+    game_setup_t msg = {
+        .timed     = menu->setup.timed,
+        .obstacles = menu->setup.obstacles,
+        .time      = menu->setup.time,
+        .world_h   = menu->setup.world_h,
+        .world_w   = menu->setup.world_w,
+        .players   = menu->setup.players
+    };
+
+    socket_write(&cl.activeSocket, (const char*)&msg, sizeof(msg));
+    socket_client_destroy(&cl);
+}
+
+static pid_t start_server_exec(int port) {
+    pid_t pid = fork();
+    if (pid < 0) return -1;
+
+    if (pid == 0) {
+        char portStr[16];
+        snprintf(portStr, sizeof(portStr), "%d", port);
+        execl("./server/serverApp", "serverApp", "6666", (char*)NULL);
+        _exit(127); // execl zlyhal
+    }
+    return pid; // parent dostane pid servera
+}
 
 void client_init(client_t *client) {
   srand((unsigned)time(NULL));
@@ -19,18 +58,6 @@ void client_init(client_t *client) {
   render_interface(&client->menu);
 }
 
-void client_create_game(client_t *client, int height, int width, GameMode mode, _Bool obstacles) {
-  pid_t pid = fork();
-
-  if (pid == 0) {
-    /* child → server */
-    execl("./server", "./server", "12345", NULL);
-    perror("exec server");
-    exit(1);
-  }
-
-}
-
 //typedef struct {
 //  world_corner_t *corners;
 //  GameMode mode;
@@ -40,32 +67,11 @@ void client_create_game(client_t *client, int height, int width, GameMode mode, 
 //  _Bool obstacles;
   //} g_settings_t;
 
-static world_corner_t *make_corners_from_setup(const game_setup_t *s) {
-    world_corner_t *c = malloc(sizeof(world_corner_t));
-    // predpoklad: (0,0) je ok, alebo to prispôsob svojmu UI rámu
-    c->startX = 0;
-    c->startY = 0;
-    c->endX   = s->world_w - 1;
-    c->endY   = s->world_h - 1;
-    return c;
-}
-
-g_settings_t g_settings_from_setup(const game_setup_t *s) {
-    g_settings_t gs;
-    gs.width  = s->world_w;
-    gs.height = s->world_h;
-    gs.obstacles = (s->obstacles != 0);
-    gs.mode = (s->timed != 0) ? TIMED : STANDARD;
-    gs.time = (int)s->time; // ak je s->time v minútach
-    gs.corners = make_corners_from_setup(s);
-    return gs;
-}
-
 void client_listen(client_t *client) {
   keypad(stdscr, TRUE);
   world_corner_t corners;
-  game_t currGame;
-  g_settings_t gSettings;
+  _Bool serverStarted = 0;
+  _Bool gameSetupSent = 0;
   while (1) {
     int keyPressed = getch();
     int newAction = handle_event(keyPressed, &client->actionManager, &client->menu);
@@ -77,11 +83,21 @@ void client_listen(client_t *client) {
         clear();
         render_frame(client->menu.currOptionCnt + 2, client->menu.longestEntry + 6, &corners);
         if (client->actionManager.state == AM_GAME) {
-          gSettings = g_settings_from_setup(&client->menu.setup);
-          game_init(&currGame, &gSettings);
-          game_run(&currGame, &gSettings);
+          if (!serverStarted) {
+            start_server_exec(6666);
+            printf("Spustam server...\n");
+            usleep(300000);
+            serverStarted = 1;
+          }
+          if (serverStarted && !gameSetupSent) {
+            send_setup_to_server(&client->menu, 6666);
+            gameSetupSent = 1;
+            usleep(100000000);
+          }  
           render_game_world(&client->menu);
         } else {
+          serverStarted = 0;
+          gameSetupSent = 0;
           render_interface(&client->menu);
         } 
       }
