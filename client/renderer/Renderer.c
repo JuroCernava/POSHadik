@@ -2,15 +2,8 @@
 #include <ncurses.h>
 #include <string.h>
 #include <stdlib.h>
-//enum Window {
-//  MENU,
-//  GAME
-//};
-//
-//typedef struct {
-//  enum Window window;
-//  game_t *currGame;
-//} display_t;
+
+#define OBSTACLE_CNT 6
 
 void init_display(display_t *display) {
   display->window = MENU;
@@ -171,6 +164,10 @@ void render_help(menu_t *menu) {
   }
 }
 
+static void render_food(int x, int y) {
+    mvaddch(y, x, '*');
+}
+
 void render_obstacle(int x, int y) {
   for (int i = -1; i < 2; ++i) {
     for (int j = -1; j < 2; ++j) {
@@ -195,8 +192,55 @@ void render_game_world(menu_t *menu) {
   refresh();
 }
 
-void render_player(position_t *newStart, position_t *oldEnd, _Bool init) {
-  
+
+void render_world_from_snap(const menu_t *menu, const world_snap_t *snap) {
+    if (!menu || !snap) return;
+
+    clear();
+
+    // rám z menu setup
+    world_corner_t corners;
+    render_frame(menu->setup.world_h, menu->setup.world_w, &corners);
+
+    // prekážky (OBSTACLE_CNT natvrdo)
+    if (snap->obstPos) {
+        for (size_t i = 0; i < OBSTACLE_CNT; ++i) {
+            int x = corners.startX + 1 + snap->obstPos[i].xPos;
+            int y = corners.startY + 1 + snap->obstPos[i].yPos;
+            render_obstacle(x, y);
+        }
+    }
+
+    // jedlo (1 na hráča)
+    if (snap->foodPos) {
+        for (size_t i = 0; i < snap->playerCnt; ++i) {
+            int x = corners.startX + 1 + snap->foodPos[i].xPos;
+            int y = corners.startY + 1 + snap->foodPos[i].yPos;
+            render_food(x, y);
+        }
+    }
+
+    // hady (pSegments je za sebou, playerLen hovorí koľko pre každého)
+    if (snap->playerLen && snap->pSegments) {
+        size_t segIdx = 0;
+
+        for (size_t p = 0; p < snap->playerCnt; ++p) {
+            size_t len = snap->playerLen[p];
+            if (len == 0) continue;
+
+            for (size_t s = 0; s < len; ++s) {
+                position_t pos = snap->pSegments[segIdx + s];
+                int x = corners.startX + 1 + pos.xPos;
+                int y = corners.startY + 1 + pos.yPos;
+
+                mvaddch(y, x, (s == 0) ? 'O' : 'o'); // hlava/telo
+            }
+
+            segIdx += len;
+        }
+    }
+
+    refresh();
 }
 
 void render_message(char *message) {
@@ -204,6 +248,18 @@ void render_message(char *message) {
   int messLen = strlen(message);
   getmaxyx(stdscr, maxY, maxX);
   mvprintw(3, maxX - (3 +messLen), "%s", message);
+}
+
+void snap_destroy(world_snap_t *s) {
+    if (!s) return;
+
+    free(s->playerLen);
+    free(s->pSegments);
+    free(s->foodPos);
+    s->playerLen = NULL;
+    s->pSegments = NULL;
+    s->foodPos   = NULL; 
+    s->playerCnt = 0;
 }
 
 void destroy_display(display_t *display) {

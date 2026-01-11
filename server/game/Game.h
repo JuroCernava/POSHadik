@@ -7,6 +7,10 @@
 #include "../../shared/position/Position.h"
 #include <pthread.h>
 #include "../../shared/socket/Socket.h"
+#include <stdint.h>
+
+#define OBSTACLE_CNT 6
+
 typedef enum {
   STANDARD,
   TIMED
@@ -50,13 +54,18 @@ typedef struct {
 } game_t;
 
 typedef struct {
-  size_t obstacleCnt;
-  size_t playerCnt;
-  int* playerScores;
-  position_t *foodPos;
-  position_t *obstaclePos;
-  position_t *pSegments;
+    uint32_t playerCnt;
+    uint32_t segmentCnt;   // súčet playerLen
+} world_snap_hdr_t;
+
+typedef struct {
+    size_t playerCnt;
+    size_t *playerLen;      // [playerCnt]
+    position_t *pSegments; 
+    position_t *foodPos;    // [playerCnt]
+    position_t obstPos[OBSTACLE_CNT];    //#define OBSTACLE_CNT 6
 } world_snap_t;
+
 
 typedef struct {
   int timed;        /* 0=STANDARD, 1=TIMED */
@@ -69,14 +78,12 @@ typedef struct {
 
 typedef struct {
   int *commands;
-  size_t commandCnt, inId, outId, cap;
-  //pthread_cond_t queueFull;
+    size_t commandCnt, inId, outId, cap;
   pthread_mutex_t mutex; 
 } command_queue_t;
 
 typedef struct {
   game_t *game;
-  world_snap_t *snap;
   command_queue_t commands;
   socket_data_t *activeSocket; 
 } game_args_t;
@@ -94,4 +101,3 @@ void game_destroy(game_t *game);
 void snap_destroy(world_snap_t *s);
 
 #endif
-

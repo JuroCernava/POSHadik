@@ -8,8 +8,6 @@
 
 typedef struct {
   game_t *game;
-  pthread_mutex_t *mutex;
-  int *commands;
   socket_server_t *socket;
   _Bool running;
 } server_t;
@@ -19,8 +17,9 @@ typedef struct {
   socket_data_t *soc;
 } recver_t;
 
-void server_init(server_t *server, int port, game_setup_t *setup);
+void server_init(server_t *server, int port);
 void* server_read_commands(void* args);
+void server_run_game(server_t *server);
 void server_destroy(server_t *server);
 
 #endif

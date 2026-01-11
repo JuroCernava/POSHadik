@@ -4,9 +4,11 @@
 #include <time.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdint.h>
+#include "../../shared/socket/Socket.h"
 
-#define OBSTACLE_CNT 6
 #define TICK_USEC 70000
+#define OBSTACLE_CNT 6
 
 static double now_seconds(void) {
     struct timespec ts;
@@ -192,58 +194,13 @@ void game_update_p_direction(game_t *game, int pId, Direction newDir) {
 }
 
 void game_pause(game_t *game, unsigned char playerId) {
-  player_pause(&game->players[playerId]);
-  update_player_direction(&game->players[playerId], STATIC);
+    player_pause(&game->players[playerId]);
+    update_player_direction(&game->players[playerId], STATIC);
 }
 
-void game_to_snap(game_t *game, world_snap_t *snap) {
-    snap->playerCnt = game->playerCnt;
-
-    // PLAYERS
-    snap->playerScores = malloc(snap->playerCnt * sizeof(int)); 
-
-    int totalSegs = 0;
-    for (size_t p = 0; p < snap->playerCnt; ++p) {
-        snap->playerScores[p] = game->players[p].score; //
-        totalSegs += snap->playerScores[p] + 1; //
-    }
-
-    snap->pSegments = malloc(totalSegs * sizeof(position_t));
-
-    int idx = 0;
-    for (size_t p = 0; p < snap->playerCnt; ++p) {
-        player_t *pl = &game->players[p];
-        for (int s = 0; s <= pl->score; ++s) {
-            snap->pSegments[idx++] = pl->positions[s];
-        }
-      }
-
-    // OBJECTS
-    snap->obstacleCnt = 0;
-    for (size_t i = 0; i < game->objectsCnt; ++i) {
-        if (game->objects[i].objectType == OBSTACLE)
-            snap->obstacleCnt++;
-    }
-
-    snap->obstaclePos = malloc(snap->obstacleCnt * sizeof(position_t));
-    snap->foodPos = malloc(snap->playerCnt * sizeof(position_t));
-
-    int oi = 0, fi = 0;
-    for (size_t i = 0; i < game->objectsCnt; ++i) {
-        if (game->objects[i].objectType == OBSTACLE) {
-            snap->obstaclePos[oi++] = game->objects[i].position;
-        } else if (game->objects[i].objectType == FOOD) {
-            if (fi < snap->playerCnt) {
-              snap->foodPos[fi++] = game->objects[i].position;
-            }
-        }
-
-    }
-}
 
 //GAME LOOP s pomocnou...
-static _Bool cq_try_pop(command_queue_t *q, int *out)
-{
+static _Bool cq_try_pop(command_queue_t *q, int *out) {
     _Bool ok = 0;
     pthread_mutex_lock(&q->mutex);
 
@@ -258,10 +215,80 @@ static _Bool cq_try_pop(command_queue_t *q, int *out)
     return ok;
 }
 
+void game_to_snap(game_t *game, world_snap_t *snap) {
+    snap->playerCnt = game->playerCnt;
+
+    // --- obstacles (fixne 6) ---
+    // default (ak by niečo chýbalo)
+    for (size_t i = 0; i < OBSTACLE_CNT; ++i) {
+        snap->obstPos[i].xPos = 0;
+        snap->obstPos[i].yPos = 0;
+    }
+
+    size_t oi = 0;
+    for (size_t i = 0; i < game->objectsCnt && oi < OBSTACLE_CNT; ++i) {
+        if (game->objects[i].objectType == OBSTACLE) {
+            snap->obstPos[oi++] = game->objects[i].position;
+        }
+    }
+
+    // --- player lengths ---
+    snap->playerLen = malloc(snap->playerCnt * sizeof(uint32_t));
+    if (!snap->playerLen) return;
+
+    size_t totalSegs = 0;
+    for (size_t p = 0; p < game->playerCnt; ++p) {
+        size_t len = (size_t)game->players[p].score + 1;
+        snap->playerLen[p] = (uint32_t)len;
+        totalSegs += len;
+    }
+
+    // --- segments ---
+    snap->pSegments = malloc(totalSegs * sizeof(position_t));
+    if (!snap->pSegments) return;
+
+    size_t idx = 0;
+    for (size_t p = 0; p < game->playerCnt; ++p) {
+        player_t *pl = &game->players[p];
+        size_t len = (size_t)snap->playerLen[p];
+        for (size_t s = 0; s < len; ++s) {
+            snap->pSegments[idx++] = pl->positions[s];
+        }
+    }
+
+    // --- food (1 na hraca) ---
+    snap->foodPos = malloc(game->playerCnt * sizeof(position_t));
+    if (!snap->foodPos) return;
+
+    size_t fi = 0;
+    for (size_t i = 0; i < game->objectsCnt && fi < game->playerCnt; ++i) {
+        if (game->objects[i].objectType == FOOD) {
+            snap->foodPos[fi++] = game->objects[i].position;
+        }
+    }
+}
+
+void send_snap(socket_data_t *sock, const world_snap_t *s) {
+    world_snap_hdr_t h;
+
+    size_t segCnt = 0;
+    for (size_t i = 0; i < s->playerCnt; ++i)
+        segCnt += s->playerLen[i];
+
+    h.playerCnt  = (uint32_t)s->playerCnt;
+    h.segmentCnt = (uint32_t)segCnt;
+
+    socket_write(sock, (char*)&h, sizeof(h));
+    socket_write(sock, (char*)s->playerLen, s->playerCnt * sizeof(size_t));
+    socket_write(sock, (char*)s->foodPos,   s->playerCnt * sizeof(position_t));
+    socket_write(sock, (char*)s->obstPos,   OBSTACLE_CNT * sizeof(position_t));
+    socket_write(sock, (char*)s->pSegments, segCnt * sizeof(position_t));
+}
+
 void* game_run(void *args) {
   game_args_t *gameArgs = args;
   game_t *game = gameArgs->game;
-  world_snap_t *currSnap = gameArgs->snap;
+  world_snap_t currSnap;
   game->running = 1;
   double start = now_seconds();
   double noLivingSince = 0.0;
@@ -270,10 +297,10 @@ void* game_run(void *args) {
     int currCommand; 
     while (cq_try_pop(&gameArgs->commands, &currCommand)) {
       switch (currCommand) {
-        case 0: update_player_direction(&game->players[0], UP); break;
-        case 1: update_player_direction(&game->players[0], DOWN); break;
-        case 2: update_player_direction(&game->players[0], LEFT); break;
-        case 3: update_player_direction(&game->players[0], RIGHT); break;
+        case 1: update_player_direction(&game->players[0], UP); break;
+        case 2: update_player_direction(&game->players[0], DOWN); break;
+        case 3: update_player_direction(&game->players[0], LEFT); break;
+        case 4: update_player_direction(&game->players[0], RIGHT); break;
       }
     }
     // 1) move living players
@@ -313,9 +340,9 @@ void* game_run(void *args) {
             }
         }
     }
-    game_to_snap(game, currSnap);
-    socket_write(activeSocket, (const char *)currSnap, sizeof(*currSnap));
-    snap_destroy(currSnap);
+    game_to_snap(game, &currSnap);
+    send_snap(activeSocket, &currSnap); 
+    snap_destroy(&currSnap);
     usleep(TICK_USEC);
   }
   shutdown(activeSocket->socket, SHUT_RDWR);
@@ -323,10 +350,40 @@ void* game_run(void *args) {
   return NULL;
 }
 
+
 void snap_destroy(world_snap_t *s) {
-    free(s->playerScores);
-    free(s->foodPos);
-    free(s->obstaclePos);
+    if (!s) return;
+
+    free(s->playerLen);
     free(s->pSegments);
-    memset(s, 0, sizeof(*s));
+    free(s->foodPos);
+    s->playerLen = NULL;
+    s->pSegments = NULL;
+    s->foodPos   = NULL;
+    s->playerCnt = 0;
 }
+
+
+void game_destroy(game_t *game) {
+    if (!game) return;
+    // hráči
+    if (game->players) {
+        free(game->players);
+        game->players = NULL;
+    }
+    // objekty (food + obstacles)
+    if (game->objects) {
+        free(game->objects);
+        game->objects = NULL;
+    }
+    // nastavenia – corners sa alokujú mallocom
+    if (game->settings.corners) {
+        free(game->settings.corners);
+        game->settings.corners = NULL;
+    }
+    // reset základných hodnôt (nie je nutné, ale bezpečné)
+    game->playerCnt = 0;
+    game->objectsCnt = 0;
+    game->running = 0;
+}
+

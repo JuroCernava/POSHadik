@@ -9,17 +9,17 @@ int main(int argc, char **argv) {
         return 1;
     }
     int port = atoi(argv[1]);
-    game_t game;
-    server_t runServer;
-    socket_server_t srv;
-    socket_server_init(&srv, port);
 
-    printf("[SERVER] Pocuvam na porte %d...\n", port);
-    socket_server_accept_connection(&srv);
-    printf("[SERVER] Klient pripojeny.\n");
+    game_t game = {0}; //secko na NULL/0
+    socket_server_t srvSocket = {0};
+    server_t server = {0};
 
-    game_setup_t msg;
-    socket_read(&srv.activeSocket, (char*)&msg, sizeof(msg)); 
-    socket_server_destroy(&srv);
+    server.game = &game; 
+    server.socket = &srvSocket; 
+
+    server_init(&server, port);
+    server_run_game(&server);
+    server_destroy(&server);
+
     return 0;
 }

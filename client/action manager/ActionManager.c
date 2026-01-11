@@ -5,6 +5,15 @@ void action_manager_init(action_manager_t *manager) {
   manager->state = AM_MENU;
 }
 
+//    while (cq_try_pop(&gameArgs->commands, &currCommand)) {
+//      switch (currCommand) {
+//        case 1: update_player_direction(&game->players[0], UP); break;
+//        case 2: update_player_direction(&game->players[0], DOWN); break;
+//        case 3: update_player_direction(&game->players[0], LEFT); break;
+//        case 4: update_player_direction(&game->players[0], RIGHT); break;
+//      }
+//    }
+
 int handle_event(int keyCode, action_manager_t *manager, menu_t *menu) {
   if (manager->state == AM_MENU) {
     switch (keyCode) {
@@ -42,10 +51,17 @@ int handle_event(int keyCode, action_manager_t *manager, menu_t *menu) {
     switch(keyCode) {
       case 32:
       case 10:
-      case 13:
-      case KEY_RIGHT:
+      case 13: 
         manager->state = AM_PAUSED;
         return 0;
+      case KEY_UP:
+        return 1;
+      case KEY_DOWN:
+        return 2;
+      case KEY_LEFT:
+        return 3;
+      case KEY_RIGHT:
+        return 4;
       default:
         return -1;
     }
